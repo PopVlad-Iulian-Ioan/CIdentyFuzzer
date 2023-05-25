@@ -1,0 +1,60 @@
+BUFFER OVERFLOW
+
+1.Input din fisier:
+
+fuzzFile = attack.bin
+fuzzedProgram = ./new-programs/a3
+attackAddress = 0x8049272
+partialAttackAddress = 0x80492
+missingBytes = 1
+mutations = 210
+inputFromFile = True
+checkForBufferOverflow = True
+detailedLog = False
+showFails = False
+
+2.Input din stdin:
+
+fuzzFile = attack.bin
+fuzzedProgram = ./vlad-iulian-pop-fuzzing/simple-vulnerable-buffer-overflow-from-stdin
+attackAddress = 0x80491f6
+partialAttackAddress = 0x80491
+missingBytes = 1
+mutations = 210
+inputFromFile = False
+checkForBufferOverflow = True
+detailedLog = False
+showFails = False
+
+
+FORMAT STRING
+
+1. Input din fisier:
+
+fuzzFile = attack.bin
+fuzzedProgram = ./format-string/formatfile2
+attackAddress = 0x80491f6
+partialAttackAddress = 0x80491
+missingBytes = 1
+mutations = 210
+inputFromFile = True
+checkForBufferOverflow = False
+detailedLog = False
+showFails = False
+
+2. Input din stdin:
+
+fuzzFile = attack.bin
+fuzzedProgram = ./format-string/format2
+attackAddress = 0x80491f6
+partialAttackAddress = 0x80491
+missingBytes = 1
+mutations = 210
+inputFromFile = False
+checkForBufferOverflow = False
+detailedLog = False
+showFails = False
+
+!Pentru a vedea mai multa memorie mapata fuzzedProgram = ./format-string/format1
+!Pentru a vedea mai multe detalii detailedLog = True si obtional showFails = True
+
