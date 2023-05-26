@@ -1,0 +1,10 @@
+fuzzFile = attack.bin
+fuzzedProgram = ./format-string/format2
+attackAddress = 0x80491f6
+partialAttackAddress = 0x8049100
+partialAttackAddressMask = 0xFFFFFF00
+mutations = 210
+inputFromFile = False
+checkForBufferOverflow = False
+detailedLog = False
+showFails = False
