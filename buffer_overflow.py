@@ -27,6 +27,7 @@ def find_min_bad_len(fuzz_file, fuzzed_program, mutations, input_from_file,detai
     min_bad_len = sys.maxsize
     len_to_reach_return_addr = sys.maxsize
     inp = ""
+    min_bad_inp=inp
     broken=0
     for i in range(1,mutations):
         inp = inp + 'A'
@@ -48,6 +49,7 @@ def find_min_bad_len(fuzz_file, fuzzed_program, mutations, input_from_file,detai
         except subprocess.CalledProcessError:
             if broken==0:
                 min_bad_len = curr_len
+                min_bad_inp=curr_len.to_bytes(4, 'big')+bytes(inp, 'utf-8')
                 broken=1
                 if detailed_log:
                     print(i, f"crushed the system with inp={repr(inp)} and len=", curr_len)
@@ -55,7 +57,9 @@ def find_min_bad_len(fuzz_file, fuzzed_program, mutations, input_from_file,detai
             if fault_addr== '0x41414141':
                 len_to_reach_return_addr=curr_len-4
                 break
-    print(f"The minimum bad len input that was found is {min_bad_len}")
+    print(f"The minimum bad len input that was found is {min_bad_len} + the 4 leading bytes representing the length of the buffer")
+    print("A generic input that would cause the system to fail could look like this:")
+    print(min_bad_inp)
     return len_to_reach_return_addr
 
 
