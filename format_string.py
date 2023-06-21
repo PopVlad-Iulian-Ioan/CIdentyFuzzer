@@ -135,7 +135,7 @@ def map_memory(fuzzed_program,format_parameter,mutations,fuzz_file,input_from_fi
                 print(outputx.stdout)
             #extract the last byte and its value from the output
             stringV=output.stdout[(i+1)*9:]
-            byteV=outputx.stdout[(i+1)*9:]
+            byteV=outputx.stdout[(i)*9:]
             string_value_of_valid_address.append(stringV)
             byte_value_of_valid_address.append(byteV)
             if detailed_log:

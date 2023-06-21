@@ -6,11 +6,7 @@ from pwnlib import *
 from pwn import p32
 import format_string
 import buffer_overflow
-       
-def test():
-    print("test")
-
-        
+             
             
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
@@ -68,7 +64,6 @@ if __name__ == '__main__':
     attack_little_endian=p32(attack_address, endian='little')
     sys.stdout = open('log.txt', 'w')
     
-    #test()
     
     if check_for_buffer_overflow:
         len_to_reach_return_addr = buffer_overflow.find_min_bad_len(fuzz_file, fuzzed_program, mutations,input_from_file,detailed_log)
@@ -93,13 +88,13 @@ if __name__ == '__main__':
                 print(f"There are {len(possitions_of_validAddresses)} bytes that contain a valid address after trying {mutations} mutations:")
                 print("They represent the relative position from the beginning of the stack of the fuzzed program:")
                 print("Offset \t \t Value")
-                possible_return_adr=[]
+                adr_that_hold_strings=[]
                 for i in range(len(possitions_of_validAddresses)):
                     if string_value_of_valid_address[i].isascii() and string_value_of_valid_address[i]!="":
-                        possible_return_adr.append(possitions_of_validAddresses[i])           
+                        adr_that_hold_strings.append(possitions_of_validAddresses[i])           
                     print(f"{possitions_of_validAddresses[i]} \t \t \t {string_value_of_valid_address[i]}\n")
-                print(f"There are {len(possible_return_adr)} addresses were the Return address could reside in:")
-                print(possible_return_adr)
+                print(f"There are {len(adr_that_hold_strings)} addresses that point to a string:")
+                print(adr_that_hold_strings)
         else:
             print("The program does NOT contain the format string vulnerability")
              
