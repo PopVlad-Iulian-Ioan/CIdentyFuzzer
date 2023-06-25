@@ -52,7 +52,7 @@ def max_length_of_the_format_string(fuzzed_program,fuzz_file,input_from_file,det
         i=i*10
     if detailed_log:
         print(f"The attack string size can be at least {int(i/10)} characters in size")
-    return i
+    return i/10
 
 
 #How long can the input be only unsing format string parameters
