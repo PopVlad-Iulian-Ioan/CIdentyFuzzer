@@ -70,29 +70,29 @@ if __name__ == '__main__':
         if len_to_reach_return_addr==sys.maxsize:
             print("The bufferoverflow was not reached or recheck if the parameters are the rigth ones")
         else:
-            buffer_overflow.attack_system(len_to_reach_return_addr,fuzzed_program,fuzz_file,attack_little_endian,input_from_file,detailed_log)
+            attack_len=buffer_overflow.attack_system(len_to_reach_return_addr,fuzzed_program,fuzz_file,attack_little_endian,input_from_file,detailed_log)
             valid_addresses=buffer_overflow.attack_with_partial_address(len_to_reach_return_addr,partial_attack_address,partial_attack_address_mask,
                                                                         fuzzed_program,fuzz_file,input_from_file,detailed_log)
             print(f"A total {len(valid_addresses)} of valid addresses that deflect the program:")
             print(valid_addresses)
-            buffer_overflow.break_system_before_return(len_to_reach_return_addr, fuzzed_program, fuzz_file, input_from_file,detailed_log)
+            buffer_overflow.break_system_before_return(attack_len, fuzzed_program, fuzz_file, input_from_file,detailed_log)
     else:
         format_parameter="%08X#"
         if format_string.check_for_format_string(fuzzed_program,format_parameter,fuzz_file,input_from_file,detailed_log):
             print("The program contains the format string vulnerability")
-            max_len=format_string.max_length_of_the_format_string(fuzzed_program,fuzz_file,input_from_file,detailed_log)
+            max_len=format_string.max_length_of_the_format_string(fuzzed_program,fuzz_file,input_from_file)
             len_of_string=format_string.how_many_format_parameters(fuzzed_program,format_parameter,mutations,max_len,fuzz_file,input_from_file,detailed_log)
             if len_of_string!=0:
-                possitions_of_validAddresses,string_value_of_valid_address=format_string.map_memory(fuzzed_program,format_parameter,len_of_string,fuzz_file,
+                positions_of_valid_addresses,string_value_of_valid_addresses=format_string.map_memory(fuzzed_program,format_parameter,len_of_string,fuzz_file,
                                                                                input_from_file,detailed_log,show_fails)
-                print(f"There are {len(possitions_of_validAddresses)} bytes that contain a valid address after trying {mutations} mutations:")
+                print(f"There are {len(positions_of_valid_addresses)} bytes that contain a valid address after trying {mutations} mutations:")
                 print("They represent the relative position from the beginning of the stack of the fuzzed program:")
                 print("Offset \t \t Value")
                 adr_that_hold_strings=[]
-                for i in range(len(possitions_of_validAddresses)):
-                    if string_value_of_valid_address[i].isascii() and string_value_of_valid_address[i]!="":
-                        adr_that_hold_strings.append(possitions_of_validAddresses[i])           
-                    print(f"{possitions_of_validAddresses[i]} \t \t \t {string_value_of_valid_address[i]}\n")
+                for i in range(len(positions_of_valid_addresses)):
+                    if string_value_of_valid_addresses[i].isascii() and string_value_of_valid_addresses[i]!="":
+                        adr_that_hold_strings.append(positions_of_valid_addresses[i])           
+                    print(f"{positions_of_valid_addresses[i]} \t \t \t {string_value_of_valid_addresses[i]}\n")
                 print(f"There are {len(adr_that_hold_strings)} addresses that point to a string:")
                 print(adr_that_hold_strings)
         else:

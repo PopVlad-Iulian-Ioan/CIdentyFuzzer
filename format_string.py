@@ -28,7 +28,7 @@ def check_for_format_string(fuzzed_program,format_parameter,fuzz_file,input_from
 
 
 #How many characters could the input buffer take
-def max_length_of_the_format_string(fuzzed_program,fuzz_file,input_from_file,detailed_log):
+def max_length_of_the_format_string(fuzzed_program,fuzz_file,input_from_file):
     inp="A"
     i=1
     gb=10_000_000_000
@@ -50,15 +50,14 @@ def max_length_of_the_format_string(fuzzed_program,fuzz_file,input_from_file,det
         except OSError:
                 break
         i=i*10
-    if detailed_log:
-        print(f"The attack string size can be at least {int(i/10)} characters in size")
+    print(f"The attack buffer size can be at least {int(i/10)} characters in size")
     return i/10
 
 
 #How long can the input be only unsing format string parameters
 def how_many_format_parameters(fuzzed_program,format_parameter,mutations,max_len,fuzz_file ,input_from_file, detailed_log):
     inp=format_parameter
-    for i in range (1,mutations):
+    for i in range (0,mutations):
         if input_from_file:
             file = open(fuzz_file, 'wb')
             attack_string=inp.encode('ascii')
@@ -69,12 +68,12 @@ def how_many_format_parameters(fuzzed_program,format_parameter,mutations,max_len
             output = subprocess.run([fuzzed_program, inp], capture_output=True, text=True, shell=False, errors='ignore')
             
         if output.returncode==-11:
-            # it must be i/len(formatParameter) since "%" and "s" whould count as two different characters
-            if int(i/len(format_parameter))< max_len:
+            # it must be input/len(formatParameter) since "%" and "s" whould count as two different characters
+            if int(input/len(format_parameter))< max_len:
                 if detailed_log:
                     print("The program contains the format string vulnerabilty")
-                    print(f"The program crashes with a string containing {i} \"{format_parameter}\"")
-                return i
+                    print(f"The program crashes with a string containing {i+1} \"{format_parameter}\"")
+                return i+1
             else:
                 if detailed_log:
                     print("The program crashed from diffrent reasons other than format string")
@@ -86,20 +85,20 @@ def how_many_format_parameters(fuzzed_program,format_parameter,mutations,max_len
         if i=='#':
             count=count+1
     if count<mutations:
-        if detailed_log:
-            print(f"The program crashes with a string containing {count} \"{format_parameter}\"")
+
+        print(f"The program crashes with a string containing {count} \"{format_parameter}\"")
         return count
     
-    if detailed_log:     
-        print(f"The program can support at least {mutations} characters of the type \"{format_parameter}\"")
+   
+    print(f"The program can support at least {mutations} characters of the type \"{format_parameter}\"")
     return mutations
 
 
 #Try to map the memory using %s at different possitions on the stack for memory leaking purposes
 def map_memory(fuzzed_program,format_parameter,mutations,fuzz_file,input_from_file,detailed_log,show_fails):
     inp=""
-    possitions_of_valid_addresses=[]
-    string_value_of_valid_address=[]
+    positions_of_valid_addresses=[]
+    string_value_of_valid_addresses=[]
     byte_value_of_valid_address=[]
     for i in range(0,mutations):
         inp=i*format_parameter+"%s#"
@@ -118,7 +117,7 @@ def map_memory(fuzzed_program,format_parameter,mutations,fuzz_file,input_from_fi
                 print(f"The input string is: {inp}")
                 print("Output using \"%s\":")
                 print(output.stdout)
-            possitions_of_valid_addresses.append(i)
+            positions_of_valid_addresses.append(i)
             inp=(i+1)*format_parameter
             if input_from_file:
                 file = open(fuzz_file, 'wb')
@@ -136,10 +135,10 @@ def map_memory(fuzzed_program,format_parameter,mutations,fuzz_file,input_from_fi
             #extract the last byte and its value from the output
             stringV=output.stdout[(i+1)*9:]
             byteV=outputx.stdout[(i)*9:]
-            string_value_of_valid_address.append(stringV)
+            string_value_of_valid_addresses.append(stringV)
             byte_value_of_valid_address.append(byteV)
             if detailed_log:
-                print(f"string value of the last format parameter: {string_value_of_valid_address[-1]}")
+                print(f"string value of the last format parameter: {string_value_of_valid_addresses[-1]}")
                 print(f"byte value of the last format parameter: {byte_value_of_valid_address[-1]}")
                 print(f"\n**************{i}**************\n")
         else:
@@ -148,6 +147,6 @@ def map_memory(fuzzed_program,format_parameter,mutations,fuzz_file,input_from_fi
                 print(f"The input string is: {inp}")
                 print("Program ended with a segmentation fault")
                 print(f"\n**************{i}**************\n")
-    return possitions_of_valid_addresses,string_value_of_valid_address
+    return positions_of_valid_addresses,string_value_of_valid_addresses
          
   

