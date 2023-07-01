@@ -1,10 +1,10 @@
 fuzzFile = attack.bin
-fuzzedProgram = ./format-string/format1
-attackAddress = 0x80491f6
-partialAttackAddress = 0x8049100
+fuzzedProgram = ./buffer-overflow/simple-vulnerable-buffer-overflow-from-file
+attackAddress = 0x8049236
+partialAttackAddress = 0x8049200
 partialAttackAddressMask = 0xFFFFFF00
 mutations = 210
-inputFromFile = False
-checkForBufferOverflow = False
+inputFromFile = True
+checkForBufferOverflow = True
 detailedLog = False
 showFails = False
