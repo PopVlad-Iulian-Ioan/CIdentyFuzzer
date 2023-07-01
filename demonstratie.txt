@@ -3,8 +3,8 @@ BUFFER OVERFLOW
 1.Input din fisier:
 
 fuzzFile = attack.bin
-fuzzedProgram = ./new-programs/a3
-attackAddress = 0x8049272
+fuzzedProgram = ./buffer-overflow/simple-vulnerable-buffer-overflow-from-file
+attackAddress = 0x8049236
 partialAttackAddress = 0x8049200
 partialAttackAddressMask = 0xFFFFFF00
 mutations = 210
@@ -16,7 +16,7 @@ showFails = False
 2.Input din stdin:
 
 fuzzFile = attack.bin
-fuzzedProgram = ./vlad-iulian-pop-fuzzing/simple-vulnerable-buffer-overflow-from-stdin
+fuzzedProgram = ./buffer-overflow/simple-vulnerable-buffer-overflow-from-stdin
 attackAddress = 0x80491f6
 partialAttackAddress = 0x8049100
 partialAttackAddressMask = 0xFFFFFF00
@@ -45,7 +45,7 @@ showFails = False
 2. Input din stdin:
 
 fuzzFile = attack.bin
-fuzzedProgram = ./format-string/format2
+fuzzedProgram = ./format-string/format1
 attackAddress = 0x80491f6
 partialAttackAddress = 0x8049100
 partialAttackAddressMask = 0xFFFFFF00
